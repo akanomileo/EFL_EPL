@@ -122,36 +122,9 @@ textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px
 @media(max-width:620px){.leader-logo{width:88px;height:88px;border-radius:22px}.topscorer-item{grid-template-columns:42px 40px minmax(0,1fr) 70px;gap:10px}.topscorer-list-logo{width:40px;height:40px;border-radius:12px}.table-team-cell{min-width:170px}.admin-logo-cell{min-width:160px}}
 
 
-/* Logo wall inside the big dark card */
-.leader-card{position:relative;overflow:hidden}
-.leader-card::before{content:"";position:absolute;inset:auto -80px -80px auto;width:220px;height:220px;background:radial-gradient(circle,rgba(255,255,255,.14),rgba(255,255,255,0));pointer-events:none}
-.leader-card::after{content:"";position:absolute;inset:-70px auto auto -70px;width:180px;height:180px;background:radial-gradient(circle,rgba(59,130,246,.18),rgba(59,130,246,0));pointer-events:none}
-.leader-logo-wall{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,minmax(0,74px));grid-auto-rows:74px;gap:12px;margin-bottom:20px;align-content:start;width:max-content;max-width:100%}
-.leader-logo-tile{position:relative;display:grid;place-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:8px;backdrop-filter:blur(4px)}
-.leader-logo-tile-main{grid-column:span 2;grid-row:span 2;padding:12px;border-radius:28px}
-.leader-wall-logo{width:100%;height:100%;object-fit:cover;background:#fff;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
-.leader-logo-tile-main .leader-wall-logo{border-radius:20px}
-.leader-wall-logo.logo-placeholder{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.2);font-size:18px}
-.leader-logo-tile-main .leader-wall-logo.logo-placeholder{font-size:28px}
-.leader-logo-tile-rank{position:absolute;top:8px;right:8px;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;background:rgba(17,24,39,.78);color:#fff;padding:4px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.14)}
-.leader-label,.leader-rank,.leader-card h3,.leader-goals,.leader-card p,.leader-meta{position:relative;z-index:1}
-@media(max-width:620px){.leader-logo-wall{grid-template-columns:repeat(4,minmax(0,56px));grid-auto-rows:56px;gap:10px}.leader-logo-tile{border-radius:18px;padding:6px}.leader-logo-tile-main{border-radius:22px;padding:8px}.leader-wall-logo{border-radius:12px}.leader-logo-tile-main .leader-wall-logo{border-radius:16px}.leader-logo-tile-rank{top:6px;right:6px;font-size:10px;padding:3px 6px}}
 
 
-/* Cleaner results page */
-.results-overview{margin-bottom:20px}
-.results-overview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}
-.results-overview-head h3{margin:0 0 6px;font-size:22px}
-.results-overview-stats{display:flex;gap:10px;flex-wrap:wrap}
-.stat-mini{min-width:92px;background:#f9fafb;border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-align:center}
-.stat-mini b{display:block;font-size:22px;line-height:1.1}
-.stat-mini span{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-top:6px;text-transform:uppercase;letter-spacing:.08em}
-.results-chip-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
-.results-chip{border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:#fff;display:grid;gap:6px}
-.results-chip b{font-size:15px}
-.results-chip span{font-size:13px;color:var(--muted);line-height:1.45}
-.results-chip.passed{background:#f9fafb;border-color:#d1d5db}
-.results-chip.upcoming{background:#eef6ff;border-color:#bfdbfe}
+/* Results page simple layout */
 .results-round-block{margin-top:26px}
 .results-round-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
 .results-round-head .round-title{margin:0;font-size:22px}
@@ -159,4 +132,21 @@ textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px
 .results-round-status.passed{background:#f3f4f6;color:#374151}
 .results-round-status.upcoming{background:#dbeafe;color:#1d4ed8}
 .results-round-status.unset{background:#fef3c7;color:#92400e}
-@media(max-width:700px){.results-overview-head{flex-direction:column}.results-overview-stats{width:100%}.stat-mini{flex:1}}
+
+/* Top scorer hero card: single large logo only */
+.leader-logo-wrap{margin-bottom:18px}
+.leader-logo{width:180px;height:180px;border-radius:34px;object-fit:cover;background:#fff;border:1px solid rgba(255,255,255,.22);box-shadow:0 18px 35px rgba(0,0,0,.22)}
+.logo-placeholder{display:grid;place-items:center;font-weight:900;letter-spacing:.04em;text-transform:uppercase;background:#eef2ff;color:#111827;border:1px solid var(--line)}
+.leader-logo.logo-placeholder{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.25);font-size:48px}
+.topscorer-list-logo{width:48px;height:48px;border-radius:14px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line)}
+.topscorer-list-logo.logo-placeholder{font-size:16px}
+.table-team-logo{width:34px;height:34px;border-radius:10px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line);flex:0 0 auto}
+.table-team-logo.logo-placeholder{font-size:12px}
+.admin-logo-cell{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:180px}
+.admin-logo-preview{width:46px;height:46px;border-radius:12px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line);flex:0 0 auto}
+.admin-logo-preview.logo-placeholder{font-size:14px}
+.logo-upload-btn,.logo-remove-btn{padding:8px 10px;font-size:12px;border-radius:10px}
+.team-card-public{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.public-team-logo{width:64px;height:64px;border-radius:16px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line)}
+.public-team-logo.logo-placeholder{font-size:20px}
+@media(max-width:620px){.leader-logo{width:120px;height:120px;border-radius:24px}.table-team-cell{min-width:170px}.admin-logo-cell{min-width:160px}}
