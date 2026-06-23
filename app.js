@@ -343,11 +343,20 @@ function renderResults() {
   init('results');
   const d = data();
   const ms = d.matches.filter((m) => m.homeScore !== '' && m.awayScore !== '');
-  const deadlineSummary = sortedRounds(d.matches)
-    .map((round) => `${escapeHtml(round)}: ${escapeHtml(roundDeadlineStatus(d.settings, round))}`)
-    .join(' • ');
-  const groupedHtml = groupByRound(ms).map(({ round, matches }) => `<h3 class="round-title">${escapeHtml(round)}</h3><div class="card">${matches.map((m) => matchCard(m)).join('')}</div>`).join('');
-  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Results</h2></div><p class="small">${deadlineSummary || 'No matchweek deadlines set yet.'}</p>${groupedHtml || '<div class="card">No results yet.</div>'}</div></section>`;
+  const rounds = sortedRounds(d.matches);
+  const configuredRounds = rounds.filter((round) => hasMatchweekDeadline(d.settings, round));
+  const passedCount = configuredRounds.filter((round) => isResultDeadlinePassed(d.settings, round)).length;
+  const upcomingCount = configuredRounds.length - passedCount;
+
+  const overviewHtml = configuredRounds.length
+    ? `<div class="card results-overview"><div class="results-overview-head"><div><h3>Deadline Overview</h3><p class="small">Only matchweeks with a saved deadline are listed here.</p></div><div class="results-overview-stats"><div class="stat-mini"><b>${configuredRounds.length}</b><span>Configured</span></div><div class="stat-mini"><b>${passedCount}</b><span>Passed</span></div><div class="stat-mini"><b>${upcomingCount}</b><span>Upcoming</span></div></div></div><div class="results-chip-grid">${configuredRounds.map((round) => `<div class="results-chip ${isResultDeadlinePassed(d.settings, round) ? 'passed' : 'upcoming'}"><b>${escapeHtml(round)}</b><span>${escapeHtml(roundDeadlineStatus(d.settings, round))}</span></div>`).join('')}</div></div>`
+    : `<div class="card results-overview"><p class="small">No matchweek deadlines have been set yet.</p></div>`;
+
+  const groupedHtml = groupByRound(ms)
+    .map(({ round, matches }) => `<div class="results-round-block"><div class="results-round-head"><h3 class="round-title">${escapeHtml(round)}</h3><span class="results-round-status ${isResultDeadlinePassed(d.settings, round) ? 'passed' : hasMatchweekDeadline(d.settings, round) ? 'upcoming' : 'unset'}">${escapeHtml(roundDeadlineStatus(d.settings, round))}</span></div><div class="card">${matches.map((m) => matchCard(m)).join('')}</div></div>`)
+    .join('');
+
+  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Results</h2></div>${overviewHtml}${groupedHtml || '<div class="card">No results yet.</div>'}</div></section>`;
 }
 
 function renderTeams() {
@@ -368,7 +377,7 @@ function renderTopScorers() {
     return;
   }
 
-  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Top Scoring Teams</h2><span class="tag">Highest scoring team award view</span></div><div class="topscorer-showcase"><div class="leader-card">${topLogoWall(scoring)}<div class="leader-label">Leading team</div><div class="leader-rank">#${leader.rank}</div><h3>${escapeHtml(leader.team)}</h3><div class="leader-goals">${leader.GF}</div><p class="small">Goals scored</p><div class="leader-meta"><span class="tag">Table position: ${leader.standingRank}</span><span class="tag">Points: ${leader.Pts}</span><span class="tag">Goal difference: ${leader.GD}</span></div></div><div class="card topscorer-side-list"><div class="small-list-heading">Top 5 scoring teams</div>${sideRows.map((row) => `<div class="topscorer-item ${row.rank === 1 ? 'is-leading' : ''}"><div class="topscorer-rank">#${row.rank}</div>${teamLogoHtml(row.team, 'topscorer-list-logo')}<div class="topscorer-team"><b>${escapeHtml(row.team)}</b><span class="small">P ${row.P} • W ${row.W} • D ${row.D} • L ${row.L}</span></div><div class="topscorer-goals">${row.GF}<span>goals</span></div></div>`).join('')}</div></div><div class="table-scroll" style="margin-top:22px"><table class="table"><tr><th>Rank</th><th>Team</th><th>Goals Scored</th><th>Matches</th><th>Points</th><th>GD</th></tr>${rows.map((row) => `<tr><td><b>#${row.rank}</b></td><td><div class="table-team-cell">${teamLogoHtml(row.team, 'table-team-logo')}<b>${escapeHtml(row.team)}</b></div></td><td>${row.GF}</td><td>${row.P}</td><td>${row.Pts}</td><td>${row.GD}</td></tr>`).join('')}</table></div></div></section>`;
+  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Top Scoring Teams</h2><span class="tag">Highest scoring team award view</span></div><div class="topscorer-showcase"><div class="leader-card">${topLogoWall(sideRows)}<div class="leader-label">Leading team</div><div class="leader-rank">#${leader.rank}</div><h3>${escapeHtml(leader.team)}</h3><div class="leader-goals">${leader.GF}</div><p class="small">Goals scored</p><div class="leader-meta"><span class="tag">Table position: ${leader.standingRank}</span><span class="tag">Points: ${leader.Pts}</span><span class="tag">Goal difference: ${leader.GD}</span></div></div><div class="card topscorer-side-list"><div class="small-list-heading">Top 5 scoring teams</div>${sideRows.map((row) => `<div class="topscorer-item ${row.rank === 1 ? 'is-leading' : ''}"><div class="topscorer-rank">#${row.rank}</div>${teamLogoHtml(row.team, 'topscorer-list-logo')}<div class="topscorer-team"><b>${escapeHtml(row.team)}</b><span class="small">P ${row.P} • W ${row.W} • D ${row.D} • L ${row.L}</span></div><div class="topscorer-goals">${row.GF}<span>goals</span></div></div>`).join('')}</div></div><div class="table-scroll" style="margin-top:22px"><table class="table"><tr><th>Rank</th><th>Team</th><th>Goals Scored</th><th>Matches</th><th>Points</th><th>GD</th></tr>${rows.map((row) => `<tr><td><b>#${row.rank}</b></td><td><div class="table-team-cell">${teamLogoHtml(row.team, 'table-team-logo')}<b>${escapeHtml(row.team)}</b></div></td><td>${row.GF}</td><td>${row.P}</td><td>${row.Pts}</td><td>${row.GD}</td></tr>`).join('')}</table></div></div></section>`;
 }
 
 function renderStandings() {
