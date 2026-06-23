@@ -349,9 +349,9 @@ function showAdminTab(tab) {
   }
 
   if (tab === 'photo') {
-    const allOptions = matches.map((m) => `<option value="${m.id}">${escapeHtml(m.round || 'Match')} — ${escapeHtml(m.home)} vs ${escapeHtml(m.away)}</option>`).join('');
-    c.innerHTML = `<h2>Photo Result Upload</h2><div id="adminMessage"></div><p class="small">Upload a clear result screenshot. OCR will try to detect the score, but you can always use manual score save below.</p><div class="tool-card"><h3>Upload result screenshot</h3><p class="small">Step 1: click Choose Result Photo. Step 2: click Read Photo.</p><input id="resultPhoto" class="hidden-file-input" type="file" accept="image/*" onchange="showChosenPhotoName(this)"><div class="admin-actions"><label class="btn alt file-picker-btn" for="resultPhoto">Choose Result Photo</label><button class="btn" onclick="runPhotoOCR()">Read Photo</button></div><p id="chosenPhotoName" class="small">No photo selected yet.</p><p id="photoOcrStatus" class="small"></p></div><br><div class="card"><h3>Manual score save</h3><p class="small">Use this when OCR cannot read the screenshot score. Choose the match, type the score, and save.</p><div class="form"><label>Match <select id="manualDirectMatchId">${allOptions}</select></label></div><div class="form compact"><input id="manualDirectHomeScore" type="number" min="0" placeholder="Home score"><input id="manualDirectAwayScore" type="number" min="0" placeholder="Away score"><button class="btn alt" onclick="saveDirectManualPhotoResult()">Save Manual Score</button></div></div><br><div id="photoResultPreview" class="card"><p class="small">No photo scanned yet.</p></div>`;
+    c.innerHTML = `<h2>Photo Result Upload</h2><div id="adminMessage"></div><p class="small">Upload a clear result screenshot. The website will read the photo, suggest a score, and let admin confirm before saving.</p><div class="tool-card"><h3>Upload result screenshot</h3><p class="small">Step 1: click Choose Result Photo. Step 2: click Read Photo.</p><input id="resultPhoto" class="hidden-file-input" type="file" accept="image/*" onchange="showChosenPhotoName(this)"><div class="admin-actions"><label class="btn alt file-picker-btn" for="resultPhoto">Choose Result Photo</label><button class="btn" onclick="runPhotoOCR()">Read Photo</button></div><p id="chosenPhotoName" class="small">No photo selected yet.</p><p id="photoOcrStatus" class="small"></p></div><br><div id="photoResultPreview" class="card"><p class="small">No photo scanned yet.</p></div>`;
   }
+
 }
 
 function parseTeamNames(raw) {
@@ -403,41 +403,17 @@ function teamAppearsInText(teamName, normalizedText) {
 }
 
 function extractScoreCandidates(text) {
-  const raw = String(text || '')
-    .replace(/[–—−]/g, '-')
-    .replace(/[０-９]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 65248));
-
-  const candidates = [];
-
-  function add(homeScore, awayScore, source = '') {
-    const h = Number(homeScore);
-    const a = Number(awayScore);
-
-    if (!Number.isFinite(h) || !Number.isFinite(a)) return;
-    if (h < 0 || a < 0 || h > 30 || a > 30) return;
-
-    candidates.push({
-      homeScore: String(h),
-      awayScore: String(a),
-      label: `${h} - ${a}${source ? ' (' + source + ')' : ''}`
-    });
-  }
-
-  const standard = /(^|[^\d])(\d{1,2})\s*[-:]\s*(\d{1,2})(?=[^\d]|$)/g;
+  const normalized = String(text || '').replace(/[–—−]/g, '-').replace(/\s+/g, ' ');
+  const matches = [];
+  const regex = /(\d{1,2})\s*-\s*(\d{1,2})/g;
   let m;
-  while ((m = standard.exec(raw)) !== null) add(m[2], m[3], 'detected');
-
-  const logoSeparated = /(^|[^\d])(\d{1,2})\s*(?:e|E|o|O|©|®|€|●|○|\(|\)|\||\/|\\|•|·|_|=|\*)\s*(\d{1,2})(?=[^\d]|$)/g;
-  while ((m = logoSeparated.exec(raw)) !== null) add(m[2], m[3], 'logo gap');
-
-  const spaced = /(^|[^\d])(\d{1,2})\s{2,}(\d{1,2})(?=[^\d]|$)/g;
-  while ((m = spaced.exec(raw)) !== null) add(m[2], m[3], 'spaced');
-
+  while ((m = regex.exec(normalized)) !== null) {
+    matches.push({ homeScore: m[1], awayScore: m[2], label: `${m[1]} - ${m[2]}` });
+  }
   const seen = new Set();
-  return candidates.filter((x) => {
-    const key = `${x.homeScore}-${x.awayScore}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+  return matches.filter((x) => {
+    if (seen.has(x.label)) return false;
+    seen.add(x.label);
     return true;
   });
 }
@@ -463,10 +439,10 @@ function renderPhotoPreview(text) {
     ? scores.map((s, i) => `<option value="${i}">${escapeHtml(s.label)}</option>`).join('')
     : '<option value="">No score detected</option>';
   const matchOptions = matches.map((m) => `<option value="${m.id}">${escapeHtml(m.round || 'Match')} — ${escapeHtml(m.home)} vs ${escapeHtml(m.away)}</option>`).join('');
-  const firstScore = scores[0] || { homeScore: '', awayScore: '' };
 
-  preview.innerHTML = `<h3>Detected Result Preview</h3><p class="small">Check carefully before saving. OCR can make mistakes.</p><div class="form"><label>Detected match <select id="detectedMatchId">${matchOptions}</select></label><label>Detected score <select id="detectedScoreIndex" onchange="fillManualScoreFromDetected()">${scoreOptions}</select></label><button class="btn" onclick="saveDetectedPhotoResult()">Confirm Save Detected Result</button></div><hr><h3>Manual correction</h3><p class="small">If OCR cannot read the score, type it here and save. This is useful for screenshots where the eFootball logo sits between the two score numbers.</p><div class="form compact"><input id="manualHomeScore" type="number" min="0" placeholder="Home" value="${escapeHtml(firstScore.homeScore)}"><input id="manualAwayScore" type="number" min="0" placeholder="Away" value="${escapeHtml(firstScore.awayScore)}"><button class="btn alt" onclick="saveManualPhotoResult()">Save Manual Score</button></div><details><summary>OCR text</summary><textarea id="ocrTextBox" rows="8">${escapeHtml(text)}</textarea><button class="btn alt" onclick="reparseEditedOCRText()">Re-parse Edited Text</button></details>`;
+  preview.innerHTML = `<h3>Detected Result Preview</h3><p class="small">Check carefully before saving. OCR can make mistakes.</p><div class="form"><label>Detected match <select id="detectedMatchId">${matchOptions}</select></label><label>Detected score <select id="detectedScoreIndex">${scoreOptions}</select></label><button class="btn" onclick="saveDetectedPhotoResult()">Confirm Save Result</button></div><details><summary>OCR text</summary><textarea id="ocrTextBox" rows="8">${escapeHtml(text)}</textarea><button class="btn alt" onclick="reparseEditedOCRText()">Re-parse Edited Text</button></details>`;
 }
+
 
 window.showChosenPhotoName = (input) => {
   const box = $('#chosenPhotoName');
@@ -512,44 +488,6 @@ window.reparseEditedOCRText = () => {
   renderPhotoPreview($('#ocrTextBox')?.value || '');
 };
 
-
-window.fillManualScoreFromDetected = () => {
-  const text = $('#ocrTextBox')?.value || '';
-  const scores = extractScoreCandidates(text);
-  const index = Number($('#detectedScoreIndex')?.value);
-
-  if (!scores.length || !Number.isFinite(index) || !scores[index]) return;
-
-  const homeBox = $('#manualHomeScore');
-  const awayBox = $('#manualAwayScore');
-
-  if (homeBox) homeBox.value = scores[index].homeScore;
-  if (awayBox) awayBox.value = scores[index].awayScore;
-};
-
-window.saveManualPhotoResult = () => {
-  const matchId = Number($('#detectedMatchId')?.value);
-  const homeScore = ($('#manualHomeScore')?.value || '').trim();
-  const awayScore = ($('#manualAwayScore')?.value || '').trim();
-
-  if (!matchId) return adminMessage('Choose a match first.', 'bad');
-  if (homeScore === '' || awayScore === '') return adminMessage('Fill both score boxes first.', 'bad');
-
-  const d = data();
-  const match = d.matches.find((m) => Number(m.id) === matchId);
-  if (!match) return adminMessage('Selected match was not found.', 'bad');
-
-  match.homeScore = homeScore;
-  match.awayScore = awayScore;
-  match.autoDrawApplied = false;
-  match.autoDrawAppliedAt = '';
-
-  setData({ matches: d.matches });
-  adminMessage(`Saved: ${match.home} ${match.homeScore} - ${match.awayScore} ${match.away}`, 'ok');
-  showAdminTab('photo');
-};
-
-
 window.saveDetectedPhotoResult = () => {
   const matchId = Number($('#detectedMatchId')?.value);
   const text = $('#ocrTextBox')?.value || '';
@@ -567,30 +505,6 @@ window.saveDetectedPhotoResult = () => {
 
   match.homeScore = scores[scoreIndex].homeScore;
   match.awayScore = scores[scoreIndex].awayScore;
-  match.autoDrawApplied = false;
-  match.autoDrawAppliedAt = '';
-
-  setData({ matches: d.matches });
-  adminMessage(`Saved: ${match.home} ${match.homeScore} - ${match.awayScore} ${match.away}`, 'ok');
-  showAdminTab('photo');
-};
-
-
-
-window.saveDirectManualPhotoResult = () => {
-  const matchId = Number($('#manualDirectMatchId')?.value);
-  const homeScore = ($('#manualDirectHomeScore')?.value || '').trim();
-  const awayScore = ($('#manualDirectAwayScore')?.value || '').trim();
-
-  if (!matchId) return adminMessage('Choose a match first.', 'bad');
-  if (homeScore === '' || awayScore === '') return adminMessage('Fill both score boxes first.', 'bad');
-
-  const d = data();
-  const match = d.matches.find((m) => Number(m.id) === matchId);
-  if (!match) return adminMessage('Selected match was not found.', 'bad');
-
-  match.homeScore = homeScore;
-  match.awayScore = awayScore;
   match.autoDrawApplied = false;
   match.autoDrawAppliedAt = '';
 
