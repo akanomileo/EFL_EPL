@@ -108,6 +108,15 @@ function sortedRounds(matches) {
     });
 }
 
+function hasMatchweekDeadline(settings, round) {
+  const d = (settings.matchweekDeadlines || {})[round] || {};
+  return Boolean(d.date && d.time);
+}
+
+function visibleFixtureMatchweeks(settings, matches) {
+  return sortedRounds(matches).filter((round) => hasMatchweekDeadline(settings, round));
+}
+
 function roundDeadlineStatus(settings, round) {
   const text = resultDeadlineText(settings, round);
   if (text === 'No deadline set') return 'No deadline set';
@@ -266,9 +275,22 @@ function renderHome() {
 function renderFixtures() {
   applyResultDeadlineDefaults();
   init('fixtures');
-  const ms = data().matches.filter((m) => m.homeScore === '' || m.awayScore === '');
-  const groupedHtml = groupByRound(ms).map(({ round, matches }) => `<h3 class="round-title">${escapeHtml(round)}</h3><div class="card">${matches.map((m) => matchCard(m)).join('')}</div>`).join('');
-  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Fixtures</h2></div>${groupedHtml || '<div class="card">No upcoming fixtures.</div>'}</div></section>`;
+  const d = data();
+  const visibleRounds = visibleFixtureMatchweeks(d.settings, d.matches);
+
+  const ms = d.matches.filter((m) =>
+    (m.homeScore === '' || m.awayScore === '') &&
+    visibleRounds.includes(m.round || 'Matchweek')
+  );
+
+  const groupedHtml = groupByRound(ms)
+    .map(({ round, matches }) => {
+      const deadlineText = resultDeadlineText(d.settings, round);
+      return `<h3 class="round-title">${escapeHtml(round)}</h3><p class="small">Result deadline: ${escapeHtml(deadlineText)}</p><div class="card">${matches.map((m) => matchCard(m)).join('')}</div>`;
+    })
+    .join('');
+
+  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Fixtures</h2></div>${groupedHtml || '<div class="card"><p class="small">No fixtures are available yet. Matchweek fixtures will appear here after admin sets the deadline for that matchweek.</p></div>'}</div></section>`;
 }
 
 function renderResults() {
@@ -389,7 +411,7 @@ function showAdminTab(tab) {
       return `<tr><td><b>${escapeHtml(round)}</b><br><span class="small">${escapeHtml(roundDeadlineStatus(settings, round))}</span></td><td><input id="mwDeadlineDate_${i}" type="date" value="${escapeHtml(saved.date || '')}"></td><td><input id="mwDeadlineTime_${i}" type="time" value="${escapeHtml(saved.time || '')}"></td></tr>`;
     }).join('');
 
-    c.innerHTML = `<h2>Fast Result Entry</h2><div id="adminMessage"></div><div class="tool-card"><h3>Matchweek result deadlines</h3><p class="small">Set a different result deadline for each matchweek. After a matchweek deadline passes, blank results in that matchweek become 0-0. Admin can still edit later.</p><div class="table-scroll"><table class="table"><tr><th>Matchweek</th><th>Deadline Date</th><th>Deadline Time</th></tr>${deadlineRows || '<tr><td colspan="3">Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveMatchweekDeadlines()">Save Matchweek Deadlines</button><button class="btn alt" onclick="applyDeadlineDrawsNow()">Apply Due 0-0 Now</button></div></div><br><p class="small">Enter all scores on one screen, then click Save All Results.</p><div class="table-scroll"><table class="table result-table"><tr><th>Round</th><th>Match</th><th>Home</th><th>Away</th><th>Status</th></tr>${matches.map((m) => `<tr><td>${escapeHtml(m.round)}</td><td><b>${escapeHtml(m.home)}</b><br><span class="small">vs ${escapeHtml(m.away)}</span></td><td><input class="score-input" id="hs_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.homeScore)}"></td><td><input class="score-input" id="as_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.awayScore)}"></td><td>${m.autoDrawApplied ? '<span class="tag">Auto 0-0</span>' : '<span class="small">Manual / pending</span>'}</td></tr>`).join('') || '<tr><td colspan="5">No matches yet. Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveAllResults()">Save All Results</button><button class="btn alt" onclick="clearAllScores()">Clear All Scores</button></div>`;
+    c.innerHTML = `<h2>Fast Result Entry</h2><div id="adminMessage"></div><div class="tool-card"><h3>Matchweek result deadlines</h3><p class="small">Set a different result deadline for each matchweek. Public fixtures only appear after a matchweek deadline is set. After the deadline passes, blank results in that matchweek become 0-0. Admin can still edit later.</p><div class="table-scroll"><table class="table"><tr><th>Matchweek</th><th>Deadline Date</th><th>Deadline Time</th></tr>${deadlineRows || '<tr><td colspan="3">Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveMatchweekDeadlines()">Save Matchweek Deadlines</button><button class="btn alt" onclick="applyDeadlineDrawsNow()">Apply Due 0-0 Now</button></div></div><br><p class="small">Enter all scores on one screen, then click Save All Results.</p><div class="table-scroll"><table class="table result-table"><tr><th>Round</th><th>Match</th><th>Home</th><th>Away</th><th>Status</th></tr>${matches.map((m) => `<tr><td>${escapeHtml(m.round)}</td><td><b>${escapeHtml(m.home)}</b><br><span class="small">vs ${escapeHtml(m.away)}</span></td><td><input class="score-input" id="hs_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.homeScore)}"></td><td><input class="score-input" id="as_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.awayScore)}"></td><td>${m.autoDrawApplied ? '<span class="tag">Auto 0-0</span>' : '<span class="small">Manual / pending</span>'}</td></tr>`).join('') || '<tr><td colspan="5">No matches yet. Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveAllResults()">Save All Results</button><button class="btn alt" onclick="clearAllScores()">Clear All Scores</button></div>`;
   }
 
   if (tab === 'photo') {
