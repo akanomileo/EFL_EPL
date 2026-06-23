@@ -98,3 +98,25 @@ textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px
 .topscorer-goals span{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-top:6px;text-transform:uppercase;letter-spacing:.08em}
 @media(max-width:850px){.topscorer-showcase{grid-template-columns:1fr}.leader-card{min-height:unset}}
 @media(max-width:620px){.topscorer-item{grid-template-columns:52px minmax(0,1fr) 78px;padding:12px}.topscorer-rank{font-size:18px}.topscorer-team b{font-size:15px}.topscorer-goals{font-size:24px}.leader-card{padding:22px;border-radius:20px}}
+
+
+/* Team logo upload + Top 5 scoring list upgrade */
+.leader-logo-wrap{margin-bottom:18px}
+.leader-logo{width:112px;height:112px;border-radius:28px;object-fit:cover;background:#fff;border:1px solid rgba(255,255,255,.22);box-shadow:0 18px 35px rgba(0,0,0,.2)}
+.logo-placeholder{display:grid;place-items:center;font-weight:900;letter-spacing:.04em;text-transform:uppercase;background:#eef2ff;color:#111827;border:1px solid var(--line)}
+.leader-logo.logo-placeholder{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.25);font-size:34px}
+.small-list-heading{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:900;padding:4px 4px 2px}
+.topscorer-item{grid-template-columns:56px 48px minmax(0,1fr) 110px}
+.topscorer-list-logo{width:48px;height:48px;border-radius:14px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line)}
+.topscorer-list-logo.logo-placeholder{font-size:16px}
+.table-team-cell{display:flex;align-items:center;gap:10px}
+.table-team-logo{width:34px;height:34px;border-radius:10px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line);flex:0 0 auto}
+.table-team-logo.logo-placeholder{font-size:12px}
+.admin-logo-cell{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:180px}
+.admin-logo-preview{width:46px;height:46px;border-radius:12px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line);flex:0 0 auto}
+.admin-logo-preview.logo-placeholder{font-size:14px}
+.logo-upload-btn,.logo-remove-btn{padding:8px 10px;font-size:12px;border-radius:10px}
+.team-card-public{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.public-team-logo{width:64px;height:64px;border-radius:16px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line)}
+.public-team-logo.logo-placeholder{font-size:20px}
+@media(max-width:620px){.leader-logo{width:88px;height:88px;border-radius:22px}.topscorer-item{grid-template-columns:42px 40px minmax(0,1fr) 70px;gap:10px}.topscorer-list-logo{width:40px;height:40px;border-radius:12px}.table-team-cell{min-width:170px}.admin-logo-cell{min-width:160px}}
