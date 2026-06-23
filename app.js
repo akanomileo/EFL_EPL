@@ -159,6 +159,7 @@ function rerenderCurrentPage() {
   else if (p === 'results.html') renderResults();
   else if (p === 'standings.html') renderStandings();
   else if (p === 'teams.html') renderTeams();
+  else if (p === 'topscorers.html') renderTopScorers();
   else if (p === 'admin.html') renderAdmin();
 }
 
@@ -175,7 +176,7 @@ function escapeHtml(value) {
 
 function layout(active) {
   const name = escapeHtml(tournamentName());
-  return `<header class="top"><div class="wrap nav"><a class="brand" href="index.html"><img src="logo.png"><span>${name}</span></a><nav class="links"><a class="${active === 'home' ? 'active' : ''}" href="index.html">Home</a><a class="${active === 'fixtures' ? 'active' : ''}" href="fixtures.html">Fixtures</a><a class="${active === 'results' ? 'active' : ''}" href="results.html">Results</a><a class="${active === 'standings' ? 'active' : ''}" href="standings.html">Standings</a><a class="${active === 'teams' ? 'active' : ''}" href="teams.html">Teams</a><a class="admin-dot" title="Admin" href="admin.html">⚙</a></nav></div></header>`;
+  return `<header class="top"><div class="wrap nav"><a class="brand" href="index.html"><img src="logo.png"><span>${name}</span></a><nav class="links"><a class="${active === 'home' ? 'active' : ''}" href="index.html">Home</a><a class="${active === 'fixtures' ? 'active' : ''}" href="fixtures.html">Fixtures</a><a class="${active === 'results' ? 'active' : ''}" href="results.html">Results</a><a class="${active === 'standings' ? 'active' : ''}" href="standings.html">Standings</a><a class="${active === 'topscorers' ? 'active' : ''}" href="topscorers.html">Top Scorers</a><a class="${active === 'teams' ? 'active' : ''}" href="teams.html">Teams</a><a class="admin-dot" title="Admin" href="admin.html">⚙</a></nav></div></header>`;
 }
 
 function init(active) {
@@ -247,6 +248,13 @@ function standings() {
   return Object.values(map).sort((a, b) => b.Pts - a.Pts || b.GD - a.GD || b.GF - a.GF || a.team.localeCompare(b.team));
 }
 
+function topScoringTeams() {
+  const rows = standings().map((r, index) => ({ ...r, standingRank: index + 1 }));
+  return rows
+    .sort((a, b) => b.GF - a.GF || b.Pts - a.Pts || b.GD - a.GD || a.team.localeCompare(b.team))
+    .map((r, index) => ({ ...r, rank: index + 1 }));
+}
+
 function groupByRound(matches) {
   const rounds = [...new Set(matches.map((m) => m.round || 'Matchweek'))]
     .sort((a, b) => {
@@ -268,8 +276,13 @@ function renderHome() {
   const pending = matches.filter((m) => m.homeScore === '' || m.awayScore === '').slice(0, 4);
   const completed = matches.filter((m) => m.homeScore !== '' && m.awayScore !== '').slice(0, 4);
   const name = escapeHtml(tournamentName(settings));
+  const scoring = topScoringTeams().slice(0, 5);
+  const leader = scoring[0];
+  const scoringHtml = leader
+    ? `<div class="topscorer-showcase"><div class="leader-card"><div class="leader-label">Leading team</div><div class="leader-rank">#${leader.rank}</div><h3>${escapeHtml(leader.team)}</h3><div class="leader-goals">${leader.GF}</div><p class="small">Goals scored</p><div class="leader-meta"><span class="tag">Table position: ${leader.standingRank}</span><span class="tag">Goal difference: ${leader.GD}</span></div></div><div class="card topscorer-side-list">${scoring.map((row) => `<div class="topscorer-item ${row.rank === 1 ? 'is-leading' : ''}"><div class="topscorer-rank">#${row.rank}</div><div class="topscorer-team"><b>${escapeHtml(row.team)}</b><span class="small">Table #${row.standingRank}</span></div><div class="topscorer-goals">${row.GF}<span>goals</span></div></div>`).join('')}</div></div>`
+    : '<div class="card"><p class="small">No teams available yet.</p></div>';
 
-  $('#app').innerHTML = `<section class="hero"><div class="wrap hero-grid"><div class="panel"><h1>${name}</h1><a class="btn" href="fixtures.html">View Fixtures</a> <a class="btn alt" href="standings.html">View League Table</a><div class="stats"><div class="stat"><b>${teams.length}</b><br><span>Teams</span></div><div class="stat"><b>${settings.leagueSize}</b><br><span>League Size</span></div><div class="stat"><b>${matches.length}</b><br><span>Fixtures</span></div></div></div><div class="panel"><h2>Upcoming Fixtures</h2>${pending.map((m) => matchCard(m)).join('') || '<p class="small">No upcoming fixtures yet.</p>'}</div></div></section><section class="section"><div class="wrap"><div class="title"><h2>Latest Results</h2><a href="results.html">View all</a></div><div class="card">${completed.map((m) => matchCard(m)).join('') || '<p class="small">No results yet.</p>'}</div></div></section>`;
+  $('#app').innerHTML = `<section class="hero"><div class="wrap hero-grid"><div class="panel"><h1>${name}</h1><a class="btn" href="fixtures.html">View Fixtures</a> <a class="btn alt" href="standings.html">View League Table</a><div class="stats"><div class="stat"><b>${teams.length}</b><br><span>Teams</span></div><div class="stat"><b>${settings.leagueSize}</b><br><span>League Size</span></div><div class="stat"><b>${matches.length}</b><br><span>Fixtures</span></div></div></div><div class="panel"><h2>Upcoming Fixtures</h2>${pending.map((m) => matchCard(m)).join('') || '<p class="small">No upcoming fixtures yet.</p>'}</div></div></section><section class="section"><div class="wrap"><div class="title"><h2>Latest Results</h2><a href="results.html">View all</a></div><div class="card">${completed.map((m) => matchCard(m)).join('') || '<p class="small">No results yet.</p>'}</div></div></section><section class="section"><div class="wrap"><div class="title"><h2>Top Scoring Teams</h2><a href="topscorers.html">View full ranking</a></div>${scoringHtml}</div></section>`;
 }
 
 function renderFixtures() {
@@ -309,6 +322,20 @@ function renderTeams() {
   init('teams');
   const { teams, settings } = data();
   $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Teams</h2><span class="tag">${teams.length}/${settings.leagueSize} teams</span></div><div class="grid">${teams.map((t, i) => `<div class="card"><h3>${escapeHtml(t.name)}</h3><span class="tag">#${i + 1}</span></div>`).join('') || '<p>No teams yet.</p>'}</div></div></section>`;
+}
+
+function renderTopScorers() {
+  applyResultDeadlineDefaults();
+  init('topscorers');
+  const rows = topScoringTeams();
+  const leader = rows[0];
+
+  if (!leader) {
+    $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Top Scoring Teams</h2></div><div class="card"><p class="small">No teams yet.</p></div></div></section>`;
+    return;
+  }
+
+  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Top Scoring Teams</h2><span class="tag">Highest scoring team award view</span></div><div class="topscorer-showcase"><div class="leader-card"><div class="leader-label">Leading team</div><div class="leader-rank">#${leader.rank}</div><h3>${escapeHtml(leader.team)}</h3><div class="leader-goals">${leader.GF}</div><p class="small">Goals scored</p><div class="leader-meta"><span class="tag">Table position: ${leader.standingRank}</span><span class="tag">Points: ${leader.Pts}</span><span class="tag">Goal difference: ${leader.GD}</span></div></div><div class="card topscorer-side-list">${rows.map((row) => `<div class="topscorer-item ${row.rank === 1 ? 'is-leading' : ''}"><div class="topscorer-rank">#${row.rank}</div><div class="topscorer-team"><b>${escapeHtml(row.team)}</b><span class="small">P ${row.P} • W ${row.W} • D ${row.D} • L ${row.L}</span></div><div class="topscorer-goals">${row.GF}<span>goals</span></div></div>`).join('')}</div></div><div class="table-scroll" style="margin-top:22px"><table class="table"><tr><th>Rank</th><th>Team</th><th>Goals Scored</th><th>Matches</th><th>Points</th><th>GD</th></tr>${rows.map((row) => `<tr><td><b>#${row.rank}</b></td><td><b>${escapeHtml(row.team)}</b></td><td>${row.GF}</td><td>${row.P}</td><td>${row.Pts}</td><td>${row.GD}</td></tr>`).join('')}</table></div></div></section>`;
 }
 
 function renderStandings() {
