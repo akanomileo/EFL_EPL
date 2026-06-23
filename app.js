@@ -270,7 +270,7 @@ function loginBox() {
 }
 
 function adminDash() {
-  return `<section class="section"><div class="wrap admin-layout"><div class="side panel"><button data-tab="settings" class="active">League Settings</button><button data-tab="teams">Bulk Teams</button><button data-tab="fixtures">Fixtures + Schedule</button><button data-tab="results">Fast Result Entry</button><button onclick="sessionStorage.removeItem('league_admin');location.reload()">Logout</button></div><div class="panel"><div id="adminContent"></div></div></div></section>`;
+  return `<section class="section"><div class="wrap admin-layout"><div class="side panel"><button data-tab="settings" class="active">League Settings</button><button data-tab="teams">Bulk Teams</button><button data-tab="fixtures">Fixtures + Schedule</button><button data-tab="results">Fast Result Entry</button><button data-tab="photo">Photo Result Upload</button><button onclick="sessionStorage.removeItem('league_admin');location.reload()">Logout</button></div><div class="panel"><div id="adminContent"></div></div></div></section>`;
 }
 
 function bindAdmin() {
@@ -379,6 +379,126 @@ function createTeamsFromNames(names, preserveIds = false, existingTeams = []) {
     name
   }));
 }
+
+
+function normalizeForMatch(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function wordsFromName(name) {
+  return normalizeForMatch(name).split(' ').filter((w) => w.length > 1);
+}
+
+function teamAppearsInText(teamName, normalizedText) {
+  const words = wordsFromName(teamName);
+  if (!words.length) return false;
+  if (normalizedText.includes(words.join(' '))) return true;
+  const hitCount = words.filter((w) => normalizedText.includes(w)).length;
+  return hitCount >= Math.max(1, Math.ceil(words.length * 0.65));
+}
+
+function extractScoreCandidates(text) {
+  const normalized = String(text || '').replace(/[–—−]/g, '-').replace(/\s+/g, ' ');
+  const matches = [];
+  const regex = /(\d{1,2})\s*-\s*(\d{1,2})/g;
+  let m;
+  while ((m = regex.exec(normalized)) !== null) {
+    matches.push({ homeScore: m[1], awayScore: m[2], label: `${m[1]} - ${m[2]}` });
+  }
+  const seen = new Set();
+  return matches.filter((x) => {
+    if (seen.has(x.label)) return false;
+    seen.add(x.label);
+    return true;
+  });
+}
+
+function suggestedMatchesFromText(text) {
+  const d = data();
+  const normalizedText = normalizeForMatch(text);
+  const scored = d.matches.map((m) => ({
+    match: m,
+    score: (teamAppearsInText(m.home, normalizedText) ? 1 : 0) + (teamAppearsInText(m.away, normalizedText) ? 1 : 0)
+  }));
+  const strong = scored.filter((x) => x.score === 2).map((x) => x.match);
+  if (strong.length) return strong;
+  const weak = scored.filter((x) => x.score === 1).map((x) => x.match);
+  return weak.length ? weak : d.matches;
+}
+
+function renderPhotoPreview(text) {
+  const preview = $('#photoResultPreview');
+  const scores = extractScoreCandidates(text);
+  const matches = suggestedMatchesFromText(text);
+  const scoreOptions = scores.length
+    ? scores.map((s, i) => `<option value="${i}">${escapeHtml(s.label)}</option>`).join('')
+    : '<option value="">No score detected</option>';
+  const matchOptions = matches.map((m) => `<option value="${m.id}">${escapeHtml(m.round || 'Match')} — ${escapeHtml(m.home)} vs ${escapeHtml(m.away)}</option>`).join('');
+
+  preview.innerHTML = `<h3>Detected Result Preview</h3><p class="small">Check carefully before saving. OCR can make mistakes.</p><div class="form"><label>Detected match <select id="detectedMatchId">${matchOptions}</select></label><label>Detected score <select id="detectedScoreIndex">${scoreOptions}</select></label><button class="btn" onclick="saveDetectedPhotoResult()">Confirm Save Result</button></div><details><summary>OCR text</summary><textarea id="ocrTextBox" rows="8">${escapeHtml(text)}</textarea><button class="btn alt" onclick="reparseEditedOCRText()">Re-parse Edited Text</button></details>`;
+}
+
+window.runPhotoOCR = async () => {
+  const input = $('#resultPhoto');
+  const status = $('#photoOcrStatus');
+
+  if (!input?.files?.length) return adminMessage('Upload a result photo first.', 'bad');
+  if (!window.Tesseract) return adminMessage('OCR library did not load. Check internet connection and refresh.', 'bad');
+
+  status.textContent = 'Reading photo... please wait.';
+  $('#photoResultPreview').innerHTML = '<p class="small">Scanning image...</p>';
+
+  try {
+    const result = await Tesseract.recognize(input.files[0], 'eng', {
+      logger: (m) => {
+        if (m.status) {
+          const progress = m.progress ? ` ${Math.round(m.progress * 100)}%` : '';
+          status.textContent = `${m.status}${progress}`;
+        }
+      }
+    });
+
+    const text = result?.data?.text || '';
+    renderPhotoPreview(text);
+    const count = extractScoreCandidates(text).length;
+    status.textContent = count ? `Detected ${count} score candidate(s). Choose the correct one and confirm.` : 'OCR finished, but no score was detected. Edit OCR text manually or try a clearer screenshot.';
+  } catch (error) {
+    console.error(error);
+    status.textContent = 'OCR failed.';
+    $('#photoResultPreview').innerHTML = '<p class="small">Could not read this photo. Try a clearer screenshot.</p>';
+    adminMessage('Photo OCR failed. Try a clearer screenshot.', 'bad');
+  }
+};
+
+window.reparseEditedOCRText = () => {
+  renderPhotoPreview($('#ocrTextBox')?.value || '');
+};
+
+window.saveDetectedPhotoResult = () => {
+  const matchId = Number($('#detectedMatchId')?.value);
+  const text = $('#ocrTextBox')?.value || '';
+  const scores = extractScoreCandidates(text);
+  const scoreIndex = Number($('#detectedScoreIndex')?.value);
+
+  if (!matchId) return adminMessage('Choose a match first.', 'bad');
+  if (!scores.length || !Number.isFinite(scoreIndex) || !scores[scoreIndex]) {
+    return adminMessage('No valid score detected. Edit OCR text or enter result manually.', 'bad');
+  }
+
+  const d = data();
+  const match = d.matches.find((m) => Number(m.id) === matchId);
+  if (!match) return adminMessage('Selected match was not found.', 'bad');
+
+  match.homeScore = scores[scoreIndex].homeScore;
+  match.awayScore = scores[scoreIndex].awayScore;
+  match.autoDrawApplied = false;
+  match.autoDrawAppliedAt = '';
+
+  setData({ matches: d.matches });
+  adminMessage(`Saved: ${match.home} ${match.homeScore} - ${match.awayScore} ${match.away}`, 'ok');
+  showAdminTab('photo');
+};
+
 
 window.saveSettings = () => {
   const s = data().settings;
