@@ -438,6 +438,15 @@ function renderPhotoPreview(text) {
   preview.innerHTML = `<h3>Detected Result Preview</h3><p class="small">Check carefully before saving. OCR can make mistakes.</p><div class="form"><label>Detected match <select id="detectedMatchId">${matchOptions}</select></label><label>Detected score <select id="detectedScoreIndex">${scoreOptions}</select></label><button class="btn" onclick="saveDetectedPhotoResult()">Confirm Save Result</button></div><details><summary>OCR text</summary><textarea id="ocrTextBox" rows="8">${escapeHtml(text)}</textarea><button class="btn alt" onclick="reparseEditedOCRText()">Re-parse Edited Text</button></details>`;
 }
 
+
+window.showChosenPhotoName = (input) => {
+  const box = $('#chosenPhotoName');
+  if (!box) return;
+  const file = input?.files?.[0];
+  box.textContent = file ? `Selected: ${file.name}` : 'No photo selected yet.';
+};
+
+
 window.runPhotoOCR = async () => {
   const input = $('#resultPhoto');
   const status = $('#photoOcrStatus');
