@@ -25,7 +25,7 @@ with check (true);
 
 insert into public.efl_league_data (key, value)
 values
-  ('settings', '{"tournamentName":"EFL League","teamLimit":48,"leagueSize":20,"fixtureFormat":"single","resultDeadlineDate":"","resultDeadlineTime":"","adminPin":""}'::jsonb),
+  ('settings', '{"tournamentName":"EFL League","teamLimit":48,"leagueSize":20,"fixtureFormat":"single","resultDeadlineDate":"","resultDeadlineTime":"","matchweekDeadlines":{},"adminPin":""}'::jsonb),
   ('teams', '[]'::jsonb),
   ('matches', '[]'::jsonb)
 on conflict (key) do nothing;

@@ -34,6 +34,7 @@ const defaults = {
     fixtureFormat: 'single',
     resultDeadlineDate: '',
     resultDeadlineTime: '',
+    matchweekDeadlines: {},
     adminPin: ''
   },
   teams: [],
@@ -61,38 +62,80 @@ function tournamentName(settings) {
   return String(s.tournamentName || defaults.settings.tournamentName).trim() || defaults.settings.tournamentName;
 }
 
-function resultDeadlineDateTime(settings) {
+function getRoundDeadline(settings, round = '') {
   const s = settings || data().settings;
-  const date = String(s.resultDeadlineDate || '').trim();
-  const time = String(s.resultDeadlineTime || '').trim();
-  if (!date || !time) return null;
-  const dt = new Date(`${date}T${time}`);
+  const deadlines = s.matchweekDeadlines || {};
+  const roundKey = String(round || '').trim();
+  const specific = roundKey ? deadlines[roundKey] : null;
+
+  if (specific && specific.date && specific.time) {
+    return { date: specific.date, time: specific.time, source: roundKey };
+  }
+
+  // Fallback for older saved data that still used one global deadline.
+  if (s.resultDeadlineDate && s.resultDeadlineTime) {
+    return { date: s.resultDeadlineDate, time: s.resultDeadlineTime, source: 'global' };
+  }
+
+  return null;
+}
+
+function resultDeadlineDateTime(settings, round = '') {
+  const deadline = getRoundDeadline(settings, round);
+  if (!deadline) return null;
+
+  const dt = new Date(`${deadline.date}T${deadline.time}`);
   return Number.isNaN(dt.getTime()) ? null : dt;
 }
 
-function resultDeadlineText(settings) {
-  const s = settings || data().settings;
-  if (!s.resultDeadlineDate || !s.resultDeadlineTime) return 'No result deadline set';
-  return `${s.resultDeadlineDate} ${s.resultDeadlineTime}`;
+function resultDeadlineText(settings, round = '') {
+  const deadline = getRoundDeadline(settings, round);
+  if (!deadline) return 'No deadline set';
+  return `${deadline.date} ${deadline.time}`;
 }
 
-function isResultDeadlinePassed(settings) {
-  const dt = resultDeadlineDateTime(settings);
+function isResultDeadlinePassed(settings, round = '') {
+  const dt = resultDeadlineDateTime(settings, round);
   return Boolean(dt && Date.now() > dt.getTime());
+}
+
+function sortedRounds(matches) {
+  return [...new Set((matches || []).map((m) => m.round || 'Matchweek'))]
+    .sort((a, b) => {
+      const na = Number(String(a).match(/\d+/)?.[0] || 0);
+      const nb = Number(String(b).match(/\d+/)?.[0] || 0);
+      return na - nb || String(a).localeCompare(String(b));
+    });
+}
+
+function roundDeadlineStatus(settings, round) {
+  const text = resultDeadlineText(settings, round);
+  if (text === 'No deadline set') return 'No deadline set';
+  return isResultDeadlinePassed(settings, round) ? `Passed: ${text}` : `Deadline: ${text}`;
 }
 
 function applyResultDeadlineDefaults() {
   const d = data();
-  if (!isResultDeadlinePassed(d.settings)) return 0;
-
   let changed = 0;
+
   d.matches = d.matches.map((m) => {
+    if (!isResultDeadlinePassed(d.settings, m.round)) return m;
+
     const missingHome = m.homeScore === '' || m.homeScore === null || m.homeScore === undefined;
     const missingAway = m.awayScore === '' || m.awayScore === null || m.awayScore === undefined;
+
     if (missingHome && missingAway) {
       changed += 1;
-      return { ...m, homeScore: '0', awayScore: '0', autoDrawApplied: true, autoDrawAppliedAt: new Date().toISOString() };
+      return {
+        ...m,
+        homeScore: '0',
+        awayScore: '0',
+        autoDrawApplied: true,
+        autoDrawAppliedAt: new Date().toISOString(),
+        autoDrawDeadlineRound: m.round || ''
+      };
     }
+
     return m;
   });
 
@@ -233,11 +276,11 @@ function renderResults() {
   init('results');
   const d = data();
   const ms = d.matches.filter((m) => m.homeScore !== '' && m.awayScore !== '');
-  const deadlineStatus = isResultDeadlinePassed(d.settings)
-    ? `Result deadline passed: ${escapeHtml(resultDeadlineText(d.settings))}. Blank results are auto-recorded as 0-0 draws.`
-    : `Result deadline: ${escapeHtml(resultDeadlineText(d.settings))}`;
+  const deadlineSummary = sortedRounds(d.matches)
+    .map((round) => `${escapeHtml(round)}: ${escapeHtml(roundDeadlineStatus(d.settings, round))}`)
+    .join(' • ');
   const groupedHtml = groupByRound(ms).map(({ round, matches }) => `<h3 class="round-title">${escapeHtml(round)}</h3><div class="card">${matches.map((m) => matchCard(m)).join('')}</div>`).join('');
-  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Results</h2></div><p class="small">${deadlineStatus}</p>${groupedHtml || '<div class="card">No results yet.</div>'}</div></section>`;
+  $('#app').innerHTML = `<section class="section"><div class="wrap"><div class="title"><h2>Results</h2></div><p class="small">${deadlineSummary || 'No matchweek deadlines set yet.'}</p>${groupedHtml || '<div class="card">No results yet.</div>'}</div></section>`;
 }
 
 function renderTeams() {
@@ -340,12 +383,13 @@ function showAdminTab(tab) {
   }
 
   if (tab === 'results') {
-    const deadlinePassed = isResultDeadlinePassed(settings);
-    const deadlineStatus = deadlinePassed
-      ? `Deadline passed: ${escapeHtml(resultDeadlineText(settings))}. Blank results will become 0-0.`
-      : `Deadline: ${escapeHtml(resultDeadlineText(settings))}`;
+    const rounds = sortedRounds(matches);
+    const deadlineRows = rounds.map((round, i) => {
+      const saved = (settings.matchweekDeadlines || {})[round] || {};
+      return `<tr><td><b>${escapeHtml(round)}</b><br><span class="small">${escapeHtml(roundDeadlineStatus(settings, round))}</span></td><td><input id="mwDeadlineDate_${i}" type="date" value="${escapeHtml(saved.date || '')}"></td><td><input id="mwDeadlineTime_${i}" type="time" value="${escapeHtml(saved.time || '')}"></td></tr>`;
+    }).join('');
 
-    c.innerHTML = `<h2>Fast Result Entry</h2><div id="adminMessage"></div><div class="tool-card"><h3>Result filling deadline</h3><p class="small">Optional. After this date and time, any match without a result automatically becomes a 0-0 draw. Admin can still edit later.</p><div class="form compact"><input id="resultDeadlineDate" type="date" value="${escapeHtml(settings.resultDeadlineDate || '')}"><input id="resultDeadlineTime" type="time" value="${escapeHtml(settings.resultDeadlineTime || '')}"><button class="btn" onclick="saveResultDeadline()">Save Deadline</button><button class="btn alt" onclick="applyDeadlineDrawsNow()">Apply 0-0 Now</button></div><p class="small">${deadlineStatus}</p></div><br><p class="small">Enter all scores on one screen, then click Save All Results.</p><div class="table-scroll"><table class="table result-table"><tr><th>Round</th><th>Match</th><th>Home</th><th>Away</th><th>Status</th></tr>${matches.map((m) => `<tr><td>${escapeHtml(m.round)}</td><td><b>${escapeHtml(m.home)}</b><br><span class="small">vs ${escapeHtml(m.away)}</span></td><td><input class="score-input" id="hs_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.homeScore)}"></td><td><input class="score-input" id="as_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.awayScore)}"></td><td>${m.autoDrawApplied ? '<span class="tag">Auto 0-0</span>' : '<span class="small">Manual / pending</span>'}</td></tr>`).join('') || '<tr><td colspan="5">No matches yet. Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveAllResults()">Save All Results</button><button class="btn alt" onclick="clearAllScores()">Clear All Scores</button></div>`;
+    c.innerHTML = `<h2>Fast Result Entry</h2><div id="adminMessage"></div><div class="tool-card"><h3>Matchweek result deadlines</h3><p class="small">Set a different result deadline for each matchweek. After a matchweek deadline passes, blank results in that matchweek become 0-0. Admin can still edit later.</p><div class="table-scroll"><table class="table"><tr><th>Matchweek</th><th>Deadline Date</th><th>Deadline Time</th></tr>${deadlineRows || '<tr><td colspan="3">Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveMatchweekDeadlines()">Save Matchweek Deadlines</button><button class="btn alt" onclick="applyDeadlineDrawsNow()">Apply Due 0-0 Now</button></div></div><br><p class="small">Enter all scores on one screen, then click Save All Results.</p><div class="table-scroll"><table class="table result-table"><tr><th>Round</th><th>Match</th><th>Home</th><th>Away</th><th>Status</th></tr>${matches.map((m) => `<tr><td>${escapeHtml(m.round)}</td><td><b>${escapeHtml(m.home)}</b><br><span class="small">vs ${escapeHtml(m.away)}</span></td><td><input class="score-input" id="hs_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.homeScore)}"></td><td><input class="score-input" id="as_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.awayScore)}"></td><td>${m.autoDrawApplied ? '<span class="tag">Auto 0-0</span>' : '<span class="small">Manual / pending</span>'}</td></tr>`).join('') || '<tr><td colspan="5">No matches yet. Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveAllResults()">Save All Results</button><button class="btn alt" onclick="clearAllScores()">Clear All Scores</button></div>`;
   }
 
   if (tab === 'photo') {
@@ -771,36 +815,45 @@ window.clearFixtureSchedule = () => {
   adminMessage('Fixture date/time cleared.', 'ok');
 };
 
-window.saveResultDeadline = () => {
+window.saveMatchweekDeadlines = () => {
   const d = data();
-  const date = ($('#resultDeadlineDate')?.value || '').trim();
-  const time = ($('#resultDeadlineTime')?.value || '').trim();
+  const rounds = sortedRounds(d.matches);
+  const deadlines = {};
 
-  if ((date && !time) || (!date && time)) {
-    return adminMessage('Please set both deadline date and deadline time, or leave both blank.', 'bad');
+  for (let i = 0; i < rounds.length; i += 1) {
+    const round = rounds[i];
+    const date = ($(`#mwDeadlineDate_${i}`)?.value || '').trim();
+    const time = ($(`#mwDeadlineTime_${i}`)?.value || '').trim();
+
+    if ((date && !time) || (!date && time)) {
+      return adminMessage(`Set both date and time for ${round}, or leave both blank.`, 'bad');
+    }
+
+    if (date && time) deadlines[round] = { date, time };
   }
 
-  d.settings.resultDeadlineDate = date;
-  d.settings.resultDeadlineTime = time;
+  d.settings.matchweekDeadlines = deadlines;
+  // Keep old global deadline fields empty so matchweek deadlines control the workflow.
+  d.settings.resultDeadlineDate = '';
+  d.settings.resultDeadlineTime = '';
   setData({ settings: d.settings });
 
   const changed = applyResultDeadlineDefaults();
   showAdminTab('results');
 
-  if (changed > 0) adminMessage(`Deadline saved. ${changed} blank result(s) auto-recorded as 0-0.`, 'ok');
-  else adminMessage('Result deadline saved.', 'ok');
+  if (changed > 0) adminMessage(`Deadlines saved. ${changed} due blank result(s) were auto-recorded as 0-0.`, 'ok');
+  else adminMessage('Matchweek deadlines saved.', 'ok');
 };
 
-window.applyDeadlineDrawsNow = () => {
-  const d = data();
-  if (!resultDeadlineDateTime(d.settings)) return adminMessage('Set the result deadline first.', 'bad');
-  if (!isResultDeadlinePassed(d.settings)) return adminMessage('Deadline has not passed yet.', 'bad');
+// Backward-compatible alias. The UI now uses saveMatchweekDeadlines().
+window.saveResultDeadline = window.saveMatchweekDeadlines;
 
+window.applyDeadlineDrawsNow = () => {
   const changed = applyResultDeadlineDefaults();
   showAdminTab('results');
 
-  if (changed > 0) adminMessage(`${changed} blank result(s) auto-recorded as 0-0.`, 'ok');
-  else adminMessage('No blank results needed auto-draw.', 'ok');
+  if (changed > 0) adminMessage(`${changed} due blank result(s) were auto-recorded as 0-0.`, 'ok');
+  else adminMessage('No due blank results found. Check matchweek deadlines.', 'ok');
 };
 
 window.saveAllResults = () => {
