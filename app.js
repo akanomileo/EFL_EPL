@@ -123,6 +123,7 @@ function roundDeadlineStatus(settings, round) {
   return isResultDeadlinePassed(settings, round) ? `Passed: ${text}` : `Deadline: ${text}`;
 }
 
+// Manual-only: this must be called by Admin button, not by public page render.
 function applyResultDeadlineDefaults() {
   const d = data();
   let changed = 0;
@@ -297,7 +298,6 @@ function groupByRound(matches) {
 }
 
 function renderHome() {
-  applyResultDeadlineDefaults();
   init('home');
   const { teams, matches, settings } = data();
   const pending = matches.filter((m) => m.homeScore === '' || m.awayScore === '').slice(0, 4);
@@ -313,7 +313,6 @@ function renderHome() {
 }
 
 function renderFixtures() {
-  applyResultDeadlineDefaults();
   init('fixtures');
   const d = data();
   const visibleRounds = visibleFixtureMatchweeks(d.settings, d.matches);
@@ -334,7 +333,6 @@ function renderFixtures() {
 }
 
 function renderResults() {
-  applyResultDeadlineDefaults();
   init('results');
   const d = data();
   const ms = d.matches.filter((m) => m.homeScore !== '' && m.awayScore !== '');
@@ -351,7 +349,6 @@ function renderTeams() {
 }
 
 function renderTopScorers() {
-  applyResultDeadlineDefaults();
   init('topscorers');
   const rows = topScoringTeams();
   const leader = rows[0];
@@ -366,14 +363,12 @@ function renderTopScorers() {
 }
 
 function renderStandings() {
-  applyResultDeadlineDefaults();
   init('standings');
   const rows = standings();
   $('#app').innerHTML = `<section class="section"><div class="wrap"><h2>League Table</h2><div class="table-scroll"><table class="table standings-table"><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr>${rows.map((r) => `<tr><td><b>${escapeHtml(r.team)}</b></td><td>${r.P}</td><td>${r.W}</td><td>${r.D}</td><td>${r.L}</td><td>${r.GF}</td><td>${r.GA}</td><td>${r.GD}</td><td><b>${r.Pts}</b></td></tr>`).join('')}</table></div>${rows.length ? '' : '<p>No standings yet.</p>'}</div></section>`;
 }
 
 function renderAdmin() {
-  applyResultDeadlineDefaults();
   init('');
   const logged = sessionStorage.getItem('league_admin') === 'yes';
   $('#app').innerHTML = logged ? adminDash() : loginBox();
@@ -468,7 +463,7 @@ Team 4"></textarea><div class="check-row"><label><input id="replaceTeams" type="
       return `<tr><td><b>${escapeHtml(round)}</b><br><span class="small">${escapeHtml(roundDeadlineStatus(settings, round))}</span></td><td><input id="mwDeadlineDate_${i}" type="date" value="${escapeHtml(saved.date || '')}"></td><td><input id="mwDeadlineTime_${i}" type="time" value="${escapeHtml(saved.time || '')}"></td></tr>`;
     }).join('');
 
-    c.innerHTML = `<h2>Fast Result Entry</h2><div id="adminMessage"></div><div class="tool-card"><h3>Matchweek result deadlines</h3><p class="small">Set a different result deadline for each matchweek. Public fixtures only appear after a matchweek deadline is set. After the deadline passes, blank results in that matchweek become 0-0. Admin can still edit later.</p><div class="table-scroll"><table class="table"><tr><th>Matchweek</th><th>Deadline Date</th><th>Deadline Time</th></tr>${deadlineRows || '<tr><td colspan="3">Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveMatchweekDeadlines()">Save Matchweek Deadlines</button><button class="btn alt" onclick="applyDeadlineDrawsNow()">Apply Due 0-0 Now</button></div></div><br><p class="small">Enter all scores on one screen, then click Save All Results.</p><div class="table-scroll"><table class="table result-table"><tr><th>Round</th><th>Match</th><th>Home</th><th>Away</th><th>Status</th></tr>${matches.map((m) => `<tr><td>${escapeHtml(m.round)}</td><td><b>${escapeHtml(m.home)}</b><br><span class="small">vs ${escapeHtml(m.away)}</span></td><td><input class="score-input" id="hs_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.homeScore)}"></td><td><input class="score-input" id="as_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.awayScore)}"></td><td>${m.autoDrawApplied ? '<span class="tag">Auto 0-0</span>' : '<span class="small">Manual / pending</span>'}</td></tr>`).join('') || '<tr><td colspan="5">No matches yet. Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveAllResults()">Save All Results</button><button class="btn alt" onclick="clearAllScores()">Clear All Scores</button></div>`;
+    c.innerHTML = `<h2>Fast Result Entry</h2><div id="adminMessage"></div><div class="tool-card"><h3>Matchweek result deadlines</h3><p class="small">Set a different result deadline for each matchweek. Public fixtures only appear after a matchweek deadline is set. Blank results will NOT become 0-0 when users open the website. Admin can manually apply due 0-0 results by clicking Apply Due 0-0 Now.</p><div class="table-scroll"><table class="table"><tr><th>Matchweek</th><th>Deadline Date</th><th>Deadline Time</th></tr>${deadlineRows || '<tr><td colspan="3">Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveMatchweekDeadlines()">Save Matchweek Deadlines</button><button class="btn alt" onclick="applyDeadlineDrawsNow()">Apply Due 0-0 Now</button><button class="btn alt" onclick="clearAutoDraws()">Undo Auto 0-0</button></div></div><br><p class="small">Enter all scores on one screen, then click Save All Results.</p><div class="table-scroll"><table class="table result-table"><tr><th>Round</th><th>Match</th><th>Home</th><th>Away</th><th>Status</th></tr>${matches.map((m) => `<tr><td>${escapeHtml(m.round)}</td><td><b>${escapeHtml(m.home)}</b><br><span class="small">vs ${escapeHtml(m.away)}</span></td><td><input class="score-input" id="hs_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.homeScore)}"></td><td><input class="score-input" id="as_${m.id}" type="number" min="0" inputmode="numeric" value="${escapeHtml(m.awayScore)}"></td><td>${m.autoDrawApplied ? '<span class="tag">Auto 0-0</span>' : '<span class="small">Manual / pending</span>'}</td></tr>`).join('') || '<tr><td colspan="5">No matches yet. Generate fixtures first.</td></tr>'}</table></div><div class="admin-actions"><button class="btn" onclick="saveAllResults()">Save All Results</button><button class="btn alt" onclick="clearAllScores()">Clear All Scores</button></div>`;
   }
 
   if (tab === 'photo') {
@@ -969,11 +964,8 @@ window.saveMatchweekDeadlines = () => {
   d.settings.resultDeadlineTime = '';
   setData({ settings: d.settings });
 
-  const changed = applyResultDeadlineDefaults();
   showAdminTab('results');
-
-  if (changed > 0) adminMessage(`Deadlines saved. ${changed} due blank result(s) were auto-recorded as 0-0.`, 'ok');
-  else adminMessage('Matchweek deadlines saved.', 'ok');
+  adminMessage('Matchweek deadlines saved. Blank results will stay pending until admin manually applies due 0-0 results.', 'ok');
 };
 
 // Backward-compatible alias. The UI now uses saveMatchweekDeadlines().
@@ -985,6 +977,33 @@ window.applyDeadlineDrawsNow = () => {
 
   if (changed > 0) adminMessage(`${changed} due blank result(s) were auto-recorded as 0-0.`, 'ok');
   else adminMessage('No due blank results found. Check matchweek deadlines.', 'ok');
+};
+
+window.clearAutoDraws = () => {
+  const d = data();
+  let changed = 0;
+
+  d.matches = d.matches.map((m) => {
+    const isAutoDraw = m.autoDrawApplied && String(m.homeScore) === '0' && String(m.awayScore) === '0';
+    if (!isAutoDraw) return m;
+    changed += 1;
+    return {
+      ...m,
+      homeScore: '',
+      awayScore: '',
+      autoDrawApplied: false,
+      autoDrawAppliedAt: '',
+      autoDrawDeadlineRound: ''
+    };
+  });
+
+  if (changed > 0) {
+    setData({ matches: d.matches });
+    showAdminTab('results');
+    adminMessage(`${changed} auto 0-0 result(s) were cleared back to pending.`, 'ok');
+  } else {
+    adminMessage('No auto 0-0 results found to clear.', 'bad');
+  }
 };
 
 window.saveAllResults = () => {
